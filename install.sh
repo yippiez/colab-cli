@@ -3,7 +3,7 @@ set -e
 
 REPO="xeodou/colab-cli"
 BINARY="colab"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 # Detect OS
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
