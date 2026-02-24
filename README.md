@@ -7,13 +7,13 @@ Useful for running training jobs, quick GPU experiments, or file transfers witho
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xeodou/colab/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/xeodou/colab-cli/main/install.sh | sh
 ```
 
 To install a specific version, set `VERSION`:
 
 ```bash
-# VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/xeodou/colab/main/install.sh | sh
+# VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/xeodou/colab-cli/main/install.sh | sh
 ```
 
 Or with Go:
@@ -25,7 +25,7 @@ go install github.com/xeodou/colab@latest
 Or build from source:
 
 ```bash
-git clone https://github.com/xeodou/colab.git
+git clone https://github.com/xeodou/colab-cli.git
 cd colab
 go build -o colab .
 ```

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="xeodou/colab"
+REPO="xeodou/colab-cli"
 BINARY="colab"
 INSTALL_DIR="/usr/local/bin"
 
