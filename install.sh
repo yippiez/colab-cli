@@ -3,7 +3,7 @@ set -e
 
 REPO="xeodou/colab-cli"
 BINARY="colab"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 # Detect OS
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -41,11 +41,13 @@ trap 'rm -rf "$TMPDIR"' EXIT
 curl -fsSL -o "${TMPDIR}/${BINARY}" "$URL"
 chmod +x "${TMPDIR}/${BINARY}"
 
-if [ -w "$INSTALL_DIR" ]; then
-  mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-else
-  echo "Need sudo to install to ${INSTALL_DIR}"
-  sudo mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-fi
+mkdir -p "$INSTALL_DIR"
+mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
 echo "Installed ${BINARY} ${VERSION} to ${INSTALL_DIR}/${BINARY}"
+
+# Check if INSTALL_DIR is in PATH
+case ":$PATH:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *) echo "Note: Add ${INSTALL_DIR} to your PATH:  export PATH=\"${INSTALL_DIR}:\$PATH\"" ;;
+esac
