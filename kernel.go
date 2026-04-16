@@ -51,6 +51,12 @@ func NewKernelClient(ctx context.Context, rt *Runtime) (*KernelClient, error) {
 	if endpoint == "" {
 		return nil, fmt.Errorf("no proxy URL available — runtime may not be fully assigned")
 	}
+	validatedEndpoint, err := validateRuntimeProxyURL(endpoint)
+	if err != nil {
+		logRuntimeProxyValidationFailure(endpoint, err)
+		return nil, fmt.Errorf("invalid runtime proxy URL: %w", err)
+	}
+	endpoint = validatedEndpoint
 
 	// Create a new Jupyter session to get a kernel.
 	// The name/path are arbitrary — Jupyter just uses them for display.

@@ -136,12 +136,18 @@ type FileClient struct {
 }
 
 // NewFileClient creates a file operations client for a runtime.
-func NewFileClient(rt *Runtime) *FileClient {
+func NewFileClient(rt *Runtime) (*FileClient, error) {
+	endpoint, err := validateRuntimeProxyURL(rt.ProxyURL)
+	if err != nil {
+		logRuntimeProxyValidationFailure(rt.ProxyURL, err)
+		return nil, fmt.Errorf("invalid runtime proxy URL: %w", err)
+	}
+
 	return &FileClient{
-		endpoint:   rt.ProxyURL,
+		endpoint:   endpoint,
 		proxyToken: rt.ProxyToken,
 		httpClient: &http.Client{Timeout: 5 * time.Minute},
-	}
+	}, nil
 }
 
 // Upload sends a local file to the Colab runtime via Contents API.

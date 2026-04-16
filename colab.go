@@ -122,7 +122,7 @@ func (c *ColabClient) AssignRuntime(ctx context.Context, gpu string) (*Runtime, 
 			existingGPU := strings.ToUpper(a.Accelerator)
 			if requestedGPU == existingGPU || requestedGPU == "" {
 				// Same GPU type — reuse
-				return c.runtimeFromAssignment(ctx, a), nil
+				return c.runtimeFromAssignment(ctx, a)
 			}
 			// Different GPU requested — release the old runtime first
 			oldRT := &Runtime{Endpoint: a.Endpoint}
@@ -143,7 +143,7 @@ func (c *ColabClient) ResumeRuntime(ctx context.Context, gpu, endpoint string) (
 			// Target a specific runtime
 			for _, a := range assignments {
 				if a.Endpoint == endpoint && a.RuntimeProxyInfo.Token != "" {
-					return c.runtimeFromAssignment(ctx, a), nil
+					return c.runtimeFromAssignment(ctx, a)
 				}
 			}
 			return nil, fmt.Errorf("no active runtime with endpoint %s", endpoint)
@@ -151,7 +151,7 @@ func (c *ColabClient) ResumeRuntime(ctx context.Context, gpu, endpoint string) (
 		// Reuse first available
 		a := assignments[0]
 		if a.Endpoint != "" && a.RuntimeProxyInfo.Token != "" {
-			return c.runtimeFromAssignment(ctx, a), nil
+			return c.runtimeFromAssignment(ctx, a)
 		}
 	}
 	if endpoint != "" {
@@ -162,18 +162,28 @@ func (c *ColabClient) ResumeRuntime(ctx context.Context, gpu, endpoint string) (
 }
 
 // runtimeFromAssignment builds a Runtime from an existing assignment and starts keep-alive.
-func (c *ColabClient) runtimeFromAssignment(ctx context.Context, a assignPostResponse) *Runtime {
+func (c *ColabClient) runtimeFromAssignment(ctx context.Context, a assignPostResponse) (*Runtime, error) {
+	proxyURL := a.RuntimeProxyInfo.URL
+	if proxyURL != "" {
+		validatedURL, err := validateRuntimeProxyURL(proxyURL)
+		if err != nil {
+			logRuntimeProxyValidationFailure(proxyURL, err)
+			return nil, fmt.Errorf("invalid runtime proxy URL: %w", err)
+		}
+		proxyURL = validatedURL
+	}
+
 	rt := &Runtime{
 		Endpoint:    a.Endpoint,
 		ProxyToken:  a.RuntimeProxyInfo.Token,
-		ProxyURL:    a.RuntimeProxyInfo.URL,
+		ProxyURL:    proxyURL,
 		Accelerator: a.Accelerator,
 	}
 	kaCtx, cancel := context.WithCancel(ctx)
 	rt.cancel = cancel
 	rt.wg.Add(1)
 	go c.keepAlive(kaCtx, rt)
-	return rt
+	return rt, nil
 }
 
 // assignNewRuntime creates a fresh Colab GPU runtime via the assign API.
@@ -200,7 +210,7 @@ func (c *ColabClient) assignNewRuntime(ctx context.Context, gpu string) (*Runtim
 	// Try parsing as existing assignment first
 	var existingAssignment assignPostResponse
 	if err := json.Unmarshal(cleaned, &existingAssignment); err == nil && existingAssignment.RuntimeProxyInfo.Token != "" {
-		return c.runtimeFromAssignment(ctx, existingAssignment), nil
+		return c.runtimeFromAssignment(ctx, existingAssignment)
 	}
 
 	// Parse as XSRF token response
@@ -261,7 +271,7 @@ func (c *ColabClient) assignNewRuntime(ctx context.Context, gpu string) (*Runtim
 		return nil, fmt.Errorf("no endpoint in assignment response: %s", stripXSSI(body))
 	}
 
-	return c.runtimeFromAssignment(ctx, assignment), nil
+	return c.runtimeFromAssignment(ctx, assignment)
 }
 
 type assignPostResponse struct {
@@ -430,7 +440,12 @@ func (c *ColabClient) RefreshProxyToken(ctx context.Context, rt *Runtime) error 
 
 	rt.ProxyToken = tokenResp.Token
 	if tokenResp.URL != "" {
-		rt.ProxyURL = tokenResp.URL
+		validatedURL, err := validateRuntimeProxyURL(tokenResp.URL)
+		if err != nil {
+			logRuntimeProxyValidationFailure(tokenResp.URL, err)
+			return fmt.Errorf("invalid runtime proxy URL: %w", err)
+		}
+		rt.ProxyURL = validatedURL
 	}
 
 	return nil
