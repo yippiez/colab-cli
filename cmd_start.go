@@ -11,6 +11,7 @@ import (
 func runStart(args []string) error {
 	jsonOutput := hasFlag(args, "--json")
 	gpu := getFlagValue(args, "--gpu", "t4")
+	authUser := getFlagValue(args, "--authuser", "0")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -20,7 +21,7 @@ func runStart(args []string) error {
 		return err
 	}
 
-	client := NewColabClient(tok.AccessToken)
+	client := NewColabClient(tok.AccessToken, authUser)
 
 	if !jsonOutput {
 		fmt.Printf("Requesting %s GPU runtime...\n", strings.ToUpper(gpu))

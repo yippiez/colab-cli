@@ -9,6 +9,7 @@ import (
 
 func runStatus(args []string) error {
 	jsonOutput := hasFlag(args, "--json")
+	authUser := getFlagValue(args, "--authuser", "0")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -18,7 +19,7 @@ func runStatus(args []string) error {
 		return err
 	}
 
-	client := NewColabClient(tok.AccessToken)
+	client := NewColabClient(tok.AccessToken, authUser)
 
 	if !jsonOutput {
 		fmt.Println("Checking runtime status...")

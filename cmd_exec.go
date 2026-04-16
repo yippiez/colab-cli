@@ -18,6 +18,7 @@ func runExec(args []string) error {
 	timeoutStr := getFlagValue(args, "--timeout", "30m")
 	inlineCode := getFlagValue(args, "-c", "")
 	session := getFlagValue(args, "--session", "")
+	authUser := getFlagValue(args, "--authuser", "0")
 
 	timeout, err := time.ParseDuration(timeoutStr)
 	if err != nil {
@@ -39,7 +40,7 @@ func runExec(args []string) error {
 				skipNext = false
 				continue
 			}
-			if arg == "--gpu" || arg == "--timeout" || arg == "-c" || arg == "--session" {
+			if arg == "--gpu" || arg == "--timeout" || arg == "-c" || arg == "--session" || arg == "--authuser" {
 				skipNext = true
 				continue
 			}
@@ -88,7 +89,7 @@ func runExec(args []string) error {
 		return err
 	}
 
-	client := NewColabClient(tok.AccessToken)
+	client := NewColabClient(tok.AccessToken, authUser)
 
 	// Get runtime: resume specific session or assign fresh
 	var rt *Runtime

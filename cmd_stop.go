@@ -10,6 +10,7 @@ import (
 
 func runStop(args []string) error {
 	jsonOutput := hasFlag(args, "--json")
+	authUser := getFlagValue(args, "--authuser", "0")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -19,7 +20,7 @@ func runStop(args []string) error {
 		return err
 	}
 
-	client := NewColabClient(tok.AccessToken)
+	client := NewColabClient(tok.AccessToken, authUser)
 
 	if !jsonOutput {
 		fmt.Println("Looking for active runtime...")

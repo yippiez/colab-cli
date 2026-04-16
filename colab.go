@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -49,15 +50,28 @@ type Runtime struct {
 // ColabClient interacts with the Colab backend API.
 type ColabClient struct {
 	token      string
+	authUser   string
 	httpClient *http.Client
 }
 
 // NewColabClient creates a new Colab API client.
-func NewColabClient(accessToken string) *ColabClient {
+func NewColabClient(accessToken, authUser string) *ColabClient {
+	if authUser == "" {
+		authUser = "0"
+	}
 	return &ColabClient{
 		token:      accessToken,
+		authUser:   authUser,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
+}
+
+func (c *ColabClient) withAuthUser(rawURL string) string {
+	sep := "?"
+	if strings.Contains(rawURL, "?") {
+		sep = "&"
+	}
+	return rawURL + sep + "authuser=" + url.QueryEscape(c.authUser)
 }
 
 // colabRequest executes an HTTP request with standard Colab headers.
@@ -190,8 +204,8 @@ func (c *ColabClient) runtimeFromAssignment(ctx context.Context, a assignPostRes
 func (c *ColabClient) assignNewRuntime(ctx context.Context, gpu string) (*Runtime, error) {
 	nbHash := uuidToNbHash(uuid.New().String())
 
-	params := fmt.Sprintf("?nbh=%s&variant=GPU&accelerator=%s&authuser=0", nbHash, strings.ToUpper(gpu))
-	assignURL := colabBackendURL + "/tun/m/assign" + params
+	params := fmt.Sprintf("?nbh=%s&variant=GPU&accelerator=%s", nbHash, strings.ToUpper(gpu))
+	assignURL := c.withAuthUser(colabBackendURL + "/tun/m/assign" + params)
 
 	// Step 1: GET to obtain XSRF token (or existing assignment)
 	resp, err := c.colabRequest(ctx, "GET", assignURL, nil)
@@ -325,7 +339,7 @@ func (c *ColabClient) UnassignRuntime(ctx context.Context, rt *Runtime) error {
 		rt.wg.Wait()
 	}
 
-	unassignURL := colabBackendURL + "/tun/m/unassign/" + rt.Endpoint + "?authuser=0"
+	unassignURL := c.withAuthUser(colabBackendURL + "/tun/m/unassign/" + rt.Endpoint)
 
 	// Step 1: GET to obtain XSRF token
 	resp, err := c.colabRequest(ctx, "GET", unassignURL, nil)
@@ -374,7 +388,7 @@ func (c *ColabClient) UnassignRuntime(ctx context.Context, rt *Runtime) error {
 
 // ListAssignments returns currently assigned runtimes.
 func (c *ColabClient) ListAssignments(ctx context.Context) ([]assignPostResponse, error) {
-	url := colabBackendURL + "/tun/m/assignments?authuser=0"
+	url := c.withAuthUser(colabBackendURL + "/tun/m/assignments")
 	resp, err := c.colabRequest(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("list assignments: %w", err)

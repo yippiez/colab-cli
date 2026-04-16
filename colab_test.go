@@ -95,3 +95,45 @@ func TestOutcomeError(t *testing.T) {
 		}
 	}
 }
+
+func TestNewColabClient_DefaultAuthUser(t *testing.T) {
+	client := NewColabClient("token", "")
+	if client.authUser != "0" {
+		t.Fatalf("authUser = %q, want 0", client.authUser)
+	}
+}
+
+func TestWithAuthUser(t *testing.T) {
+	client := NewColabClient("token", "1")
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "append to url without query",
+			in:   "https://colab.research.google.com/tun/m/assignments",
+			want: "https://colab.research.google.com/tun/m/assignments?authuser=1",
+		},
+		{
+			name: "append to url with query",
+			in:   "https://colab.research.google.com/tun/m/assign?variant=GPU",
+			want: "https://colab.research.google.com/tun/m/assign?variant=GPU&authuser=1",
+		},
+		{
+			name: "escape authuser value",
+			in:   "https://colab.research.google.com/tun/m/assignments",
+			want: "https://colab.research.google.com/tun/m/assignments?authuser=1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := client.withAuthUser(tt.in)
+			if got != tt.want {
+				t.Fatalf("withAuthUser(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}

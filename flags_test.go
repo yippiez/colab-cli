@@ -85,6 +85,12 @@ func TestPositionalArgs(t *testing.T) {
 			want:           []string{"train.py"},
 		},
 		{
+			name:           "with authuser flag",
+			args:           []string{"--authuser", "1", "--gpu", "a100", "train.py"},
+			flagsWithValue: []string{"--authuser", "--gpu"},
+			want:           []string{"train.py"},
+		},
+		{
 			name:           "no args",
 			args:           []string{},
 			flagsWithValue: []string{"--gpu"},

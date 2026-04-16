@@ -72,6 +72,7 @@ Options:
   --gpu t4|l4|a100      GPU type (default: t4)
   --timeout 30m         Execution timeout (default: 30m)
   --session <id>        Use a specific runtime session
+  --authuser <value>    Google authuser value (default: 0)
   -h, --help            Show this help
   -v, --version         Show version
 

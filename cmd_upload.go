@@ -12,8 +12,9 @@ func runUpload(args []string) error {
 	jsonOutput := hasFlag(args, "--json")
 	gpu := getFlagValue(args, "--gpu", "t4")
 	session := getFlagValue(args, "--session", "")
+	authUser := getFlagValue(args, "--authuser", "0")
 
-	positional := positionalArgs(args, "--gpu", "--session")
+	positional := positionalArgs(args, "--gpu", "--session", "--authuser")
 
 	if len(positional) < 1 {
 		return fmt.Errorf("usage: colab upload <local-file> [remote-path]")
@@ -33,7 +34,7 @@ func runUpload(args []string) error {
 		return err
 	}
 
-	client := NewColabClient(tok.AccessToken)
+	client := NewColabClient(tok.AccessToken, authUser)
 
 	if !jsonOutput {
 		fmt.Println("Connecting to runtime...")
