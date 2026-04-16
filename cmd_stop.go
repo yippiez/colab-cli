@@ -53,10 +53,10 @@ func runStop(args []string) error {
 			Accelerator: a.Accelerator,
 		}
 		if !jsonOutput {
-			fmt.Printf("Releasing %s (%s)...\n", rt.Accelerator, rt.Endpoint)
+			fmt.Printf("Releasing %s runtime...\n", rt.Accelerator)
 		}
 		if err := client.UnassignRuntime(ctx, rt); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to release %s: %v\n", rt.Endpoint, err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to release runtime: %v\n", err)
 			continue
 		}
 		released++

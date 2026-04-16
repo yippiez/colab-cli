@@ -71,16 +71,10 @@ func runStatus(args []string) error {
 
 	// Basic info from assignment
 	if jsonOutput {
-		out := map[string]interface{}{
-			"gpu":       rt.Accelerator,
-			"endpoint":  rt.Endpoint,
-			"connected": true,
-		}
-		data, _ := json.MarshalIndent(out, "", "  ")
+		data, _ := json.MarshalIndent(basicStatusOutput(rt), "", "  ")
 		fmt.Println(string(data))
 	} else {
 		fmt.Printf("GPU:        %s\n", rt.Accelerator)
-		fmt.Printf("Endpoint:   %s\n", rt.Endpoint)
 		fmt.Printf("Connected:  true\n")
 	}
 

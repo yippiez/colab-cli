@@ -32,16 +32,10 @@ func runStart(args []string) error {
 	}
 
 	if jsonOutput {
-		out := map[string]interface{}{
-			"status":   "started",
-			"session":  rt.Endpoint,
-			"gpu":      rt.Accelerator,
-			"proxyUrl": rt.ProxyURL,
-		}
-		data, _ := json.MarshalIndent(out, "", "  ")
+		data, _ := json.MarshalIndent(startOutput(rt), "", "  ")
 		fmt.Println(string(data))
 	} else {
-		fmt.Printf("Runtime started: %s (%s)\n", rt.Accelerator, rt.Endpoint)
+		fmt.Printf("Runtime started: %s\n", rt.Accelerator)
 		fmt.Printf("Session: %s\n", rt.Endpoint)
 		fmt.Println("\nUse this session with other commands:")
 		fmt.Printf("  colab exec --session %s script.py\n", rt.Endpoint)

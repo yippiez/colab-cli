@@ -139,7 +139,7 @@ func runExec(args []string) error {
 	}
 
 	if !jsonOutput {
-		fmt.Printf("Runtime: %s (%s)\n", rt.Accelerator, rt.Endpoint)
+		fmt.Printf("Runtime: %s\n", rt.Accelerator)
 	}
 
 	// Connect to kernel
