@@ -34,6 +34,8 @@ func main() {
 		err = runStatus(args)
 	case "stop":
 		err = runStop(args)
+	case "logout":
+		err = runLogout(args)
 	case "version", "--version", "-v":
 		fmt.Printf("colab %s\n", version)
 	case "help", "--help", "-h":
@@ -63,6 +65,7 @@ Commands:
   quota                 Show GPU quota, CCU balance, eligible accelerators
   status                Show runtime info (GPU, memory, idle time)
   stop                  Release the Colab runtime
+  logout                Revoke cached auth and delete the local token cache
 
 Options:
   --json                Machine-readable JSON output

@@ -7,8 +7,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/int128/oauth2cli"
@@ -20,6 +24,8 @@ const (
 	defaultClientID     = "1014160490159-cvot3bea7tgkp72a4m29h20d9ddo6bne.apps.googleusercontent.com"
 	defaultClientSecret = "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"
 )
+
+var googleRevokeURL = "https://oauth2.googleapis.com/revoke"
 
 // getOAuthConfig returns the OAuth2 config, using environment variables if set.
 // Override with COLAB_CLIENT_ID and COLAB_CLIENT_SECRET for custom credentials.
@@ -127,6 +133,54 @@ func getToken(ctx context.Context) (*oauth2.Token, error) {
 	}
 
 	return newTok, nil
+}
+
+func revocableToken(tok *oauth2.Token) string {
+	if tok == nil {
+		return ""
+	}
+	if tok.RefreshToken != "" {
+		return tok.RefreshToken
+	}
+	return tok.AccessToken
+}
+
+func revokeToken(ctx context.Context, tok *oauth2.Token) error {
+	tokenValue := revocableToken(tok)
+	if tokenValue == "" {
+		return fmt.Errorf("no token available to revoke")
+	}
+
+	form := url.Values{"token": {tokenValue}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, googleRevokeURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("create revoke request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send revoke request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("revoke request failed (status %d): %s", resp.StatusCode, body)
+	}
+
+	return nil
+}
+
+func clearTokenCache() error {
+	path, err := tokenCachePath()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove token cache: %w", err)
+	}
+	return nil
 }
 
 // generatePKCE creates a S256 PKCE verifier and challenge pair.
