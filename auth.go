@@ -43,8 +43,6 @@ func getOAuthConfig() oauth2.Config {
 		ClientSecret: clientSecret,
 		Endpoint:     google.Endpoint,
 		Scopes: []string{
-			"profile",
-			"email",
 			"https://www.googleapis.com/auth/colaboratory",
 		},
 	}
