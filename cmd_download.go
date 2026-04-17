@@ -11,6 +11,7 @@ import (
 func runDownload(args []string) error {
 	jsonOutput := hasFlag(args, "--json")
 	gpu := getFlagValue(args, "--gpu", "t4")
+	cpu := hasFlag(args, "--cpu")
 	session := getFlagValue(args, "--session", "")
 	authUser := getFlagValue(args, "--authuser", "0")
 
@@ -42,9 +43,9 @@ func runDownload(args []string) error {
 
 	var rt *Runtime
 	if session != "" {
-		rt, err = client.ResumeRuntime(ctx, gpu, session)
+		rt, err = client.ResumeRuntime(ctx, gpu, cpu, session)
 	} else {
-		rt, err = client.AssignRuntime(ctx, gpu)
+		rt, err = client.AssignRuntime(ctx, gpu, cpu)
 	}
 	if err != nil {
 		return fmt.Errorf("assign runtime: %w", err)

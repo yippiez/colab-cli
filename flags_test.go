@@ -15,6 +15,7 @@ func TestHasFlag(t *testing.T) {
 		{[]string{}, "--json", false},
 		{[]string{"--json"}, "--json", true},
 		{[]string{"--gpu", "t4", "--json"}, "--json", true},
+		{[]string{"--cpu", "--json"}, "--cpu", true},
 	}
 
 	for _, tt := range tests {
@@ -69,6 +70,12 @@ func TestPositionalArgs(t *testing.T) {
 		{
 			name:           "with boolean flag",
 			args:           []string{"--json", "file.py"},
+			flagsWithValue: []string{"--gpu"},
+			want:           []string{"file.py"},
+		},
+		{
+			name:           "with cpu boolean flag",
+			args:           []string{"--cpu", "file.py"},
 			flagsWithValue: []string{"--gpu"},
 			want:           []string{"file.py"},
 		},

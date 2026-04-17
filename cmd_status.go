@@ -60,10 +60,10 @@ func runStatus(args []string) error {
 				data, _ := json.MarshalIndent(status, "", "  ")
 				fmt.Println(string(data))
 			} else {
-				fmt.Printf("GPU:        %s\n", status.GPU)
-				fmt.Printf("Memory:     %d MB\n", status.MemoryMB)
-				fmt.Printf("Idle:       %ds\n", status.IdleSecs)
-				fmt.Printf("Connected:  %v\n", status.Connected)
+				fmt.Printf("Accelerator: %s\n", status.GPU)
+				fmt.Printf("Memory:      %d MB\n", status.MemoryMB)
+				fmt.Printf("Idle:        %ds\n", status.IdleSecs)
+				fmt.Printf("Connected:   %v\n", status.Connected)
 			}
 			return nil
 		}
@@ -75,8 +75,8 @@ func runStatus(args []string) error {
 		data, _ := json.MarshalIndent(basicStatusOutput(rt), "", "  ")
 		fmt.Println(string(data))
 	} else {
-		fmt.Printf("GPU:        %s\n", rt.Accelerator)
-		fmt.Printf("Connected:  true\n")
+		fmt.Printf("Accelerator: %s\n", rt.Accelerator)
+		fmt.Printf("Connected:   true\n")
 	}
 
 	return nil

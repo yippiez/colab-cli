@@ -57,19 +57,20 @@ func printUsage() {
 
 Commands:
   auth                  Authenticate with Google (OAuth2 browser flow)
-  start                 Start a GPU runtime and print the session ID
-  exec <file>           Execute .py or .ipynb on Colab GPU
-  exec -c "code"        Execute inline Python code on Colab GPU
-  upload <local> [remote]   Upload file to Colab runtime
-  download <remote> [local] Download file from Colab runtime
+  start                 Start a Colab runtime and print the session ID
+  exec <file>           Execute .py or .ipynb on Colab
+  exec -c "code"        Execute inline Python code on Colab
+  upload <local> [remote]   Upload file to the Colab runtime
+  download <remote> [local] Download file from the Colab runtime
   quota                 Show GPU quota, CCU balance, eligible accelerators
-  status                Show runtime info (GPU, memory, idle time)
+  status                Show runtime info (accelerator, memory, idle time)
   stop                  Release the Colab runtime
   logout                Revoke cached auth and delete the local token cache
 
 Options:
   --json                Machine-readable JSON output
-  --gpu t4|l4|a100      GPU type (default: t4)
+  --gpu t4|l4|a100      GPU type to request (default: t4)
+  --cpu                 Request a CPU runtime instead of a GPU
   --timeout 30m         Execution timeout (default: 30m)
   --session <id>        Use a specific runtime session
   --authuser <value>    Google authuser value (default: 0)
@@ -79,10 +80,11 @@ Options:
 Examples:
   colab exec train.py                          # one-shot: assign, run, release
   colab exec --gpu a100 train.py               # one-shot with A100
-  colab exec -c "import torch; print(torch.cuda.get_device_name(0))"
+  colab exec --cpu -c "print('hello from cpu')"
 
   # Long-running session:
-  colab start --gpu t4                         # → prints session ID
+  colab start --gpu t4                         # → prints GPU session ID
+  colab start --cpu                            # → prints CPU session ID
   colab upload --session <id> data.tar.gz      # upload to that runtime
   colab exec --session <id> train.py           # run on that runtime
   colab download --session <id> model.bin      # download results

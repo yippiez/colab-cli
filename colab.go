@@ -124,37 +124,33 @@ func uuidToNbHash(u string) string {
 	return s
 }
 
-// AssignRuntime requests a Colab GPU runtime, reusing an existing one if available.
-func (c *ColabClient) AssignRuntime(ctx context.Context, gpu string) (*Runtime, error) {
+// AssignRuntime requests a Colab runtime, reusing an existing one if available.
+func (c *ColabClient) AssignRuntime(ctx context.Context, gpu string, cpu bool) (*Runtime, error) {
 	// Check for an existing runtime first to avoid 412 conflicts.
-	// If the existing runtime matches the requested GPU (or no specific GPU preference),
+	// If the existing runtime matches the requested accelerator,
 	// reuse it. Otherwise, release it first so we can assign the requested type.
 	if assignments, err := c.ListAssignments(ctx); err == nil && len(assignments) > 0 {
 		a := assignments[0]
 		if a.Endpoint != "" && a.RuntimeProxyInfo.Token != "" {
-			requestedGPU := strings.ToUpper(gpu)
-			existingGPU := strings.ToUpper(a.Accelerator)
-			if requestedGPU == existingGPU || requestedGPU == "" {
-				// Same GPU type — reuse
+			requestedAccelerator := requestedAccelerator(gpu, cpu)
+			existingAccelerator := strings.ToUpper(a.Accelerator)
+			if requestedAccelerator == existingAccelerator {
 				return c.runtimeFromAssignment(ctx, a)
 			}
-			// Different GPU requested — release the old runtime first
 			oldRT := &Runtime{Endpoint: a.Endpoint}
 			_ = c.UnassignRuntime(ctx, oldRT)
 		}
 	}
 
-	return c.assignNewRuntime(ctx, gpu)
+	return c.assignNewRuntime(ctx, gpu, cpu)
 }
 
 // ResumeRuntime reconnects to an existing runtime, or creates a new one if none exists.
 // If endpoint is non-empty, it targets that specific runtime.
-// With --resume the runtime is never released, so subsequent commands can reuse it.
-func (c *ColabClient) ResumeRuntime(ctx context.Context, gpu, endpoint string) (*Runtime, error) {
+func (c *ColabClient) ResumeRuntime(ctx context.Context, gpu string, cpu bool, endpoint string) (*Runtime, error) {
 	assignments, err := c.ListAssignments(ctx)
 	if err == nil && len(assignments) > 0 {
 		if endpoint != "" {
-			// Target a specific runtime
 			for _, a := range assignments {
 				if a.Endpoint == endpoint && a.RuntimeProxyInfo.Token != "" {
 					return c.runtimeFromAssignment(ctx, a)
@@ -162,17 +158,18 @@ func (c *ColabClient) ResumeRuntime(ctx context.Context, gpu, endpoint string) (
 			}
 			return nil, fmt.Errorf("no active runtime with endpoint %s", endpoint)
 		}
-		// Reuse first available
-		a := assignments[0]
-		if a.Endpoint != "" && a.RuntimeProxyInfo.Token != "" {
-			return c.runtimeFromAssignment(ctx, a)
+
+		requestedAccelerator := requestedAccelerator(gpu, cpu)
+		for _, a := range assignments {
+			if a.Endpoint != "" && a.RuntimeProxyInfo.Token != "" && strings.ToUpper(a.Accelerator) == requestedAccelerator {
+				return c.runtimeFromAssignment(ctx, a)
+			}
 		}
 	}
 	if endpoint != "" {
 		return nil, fmt.Errorf("no active runtime with endpoint %s", endpoint)
 	}
-	// No active runtime — create one
-	return c.assignNewRuntime(ctx, gpu)
+	return c.assignNewRuntime(ctx, gpu, cpu)
 }
 
 // runtimeFromAssignment builds a Runtime from an existing assignment and starts keep-alive.
@@ -200,11 +197,25 @@ func (c *ColabClient) runtimeFromAssignment(ctx context.Context, a assignPostRes
 	return rt, nil
 }
 
-// assignNewRuntime creates a fresh Colab GPU runtime via the assign API.
-func (c *ColabClient) assignNewRuntime(ctx context.Context, gpu string) (*Runtime, error) {
+func requestedAccelerator(gpu string, cpu bool) string {
+	if cpu {
+		return "NONE"
+	}
+	return strings.ToUpper(gpu)
+}
+
+func assignRuntimeParams(nbHash, gpu string, cpu bool) string {
+	if cpu {
+		return fmt.Sprintf("?nbh=%s", nbHash)
+	}
+	return fmt.Sprintf("?nbh=%s&variant=GPU&accelerator=%s", nbHash, strings.ToUpper(gpu))
+}
+
+// assignNewRuntime creates a fresh Colab runtime via the assign API.
+func (c *ColabClient) assignNewRuntime(ctx context.Context, gpu string, cpu bool) (*Runtime, error) {
 	nbHash := uuidToNbHash(uuid.New().String())
 
-	params := fmt.Sprintf("?nbh=%s&variant=GPU&accelerator=%s", nbHash, strings.ToUpper(gpu))
+	params := assignRuntimeParams(nbHash, gpu, cpu)
 	assignURL := c.withAuthUser(colabBackendURL + "/tun/m/assign" + params)
 
 	// Step 1: GET to obtain XSRF token (or existing assignment)
@@ -289,12 +300,12 @@ func (c *ColabClient) assignNewRuntime(ctx context.Context, gpu string) (*Runtim
 }
 
 type assignPostResponse struct {
-	Endpoint    string `json:"endpoint"`
-	Accelerator string `json:"accelerator"`
-	Outcome     int    `json:"outcome"` // 0=undefined, 1=quota_denied, 2=quota_exceeded, 4=success, 5=denylisted
-	Fit         int    `json:"fit"`     // frontend idle timeout in seconds
-	Sub         int    `json:"sub"`     // subscription state: 1=unsubscribed, 2=recurring, 3=non-recurring
-	SubTier     int    `json:"subTier"` // 0=none, 1=pro, 2=pro+
+	Endpoint         string `json:"endpoint"`
+	Accelerator      string `json:"accelerator"`
+	Outcome          int    `json:"outcome"` // 0=undefined, 1=quota_denied, 2=quota_exceeded, 4=success, 5=denylisted
+	Fit              int    `json:"fit"`     // frontend idle timeout in seconds
+	Sub              int    `json:"sub"`     // subscription state: 1=unsubscribed, 2=recurring, 3=non-recurring
+	SubTier          int    `json:"subTier"` // 0=none, 1=pro, 2=pro+
 	RuntimeProxyInfo struct {
 		Token              string `json:"token"`
 		TokenExpiresInSecs int    `json:"tokenExpiresInSeconds"`

@@ -1,8 +1,8 @@
 # colab
 
-A Go CLI to execute Python code on Google Colab GPUs from the terminal.
+A Go CLI to execute Python code on Google Colab runtimes from the terminal.
 
-Useful for running training jobs, quick GPU experiments, or file transfers without opening a browser.
+Useful for running training jobs, quick CPU/GPU experiments, or file transfers without opening a browser.
 
 ## Install
 
@@ -39,10 +39,13 @@ colab auth
 # 2. Run code on a T4 GPU
 colab exec -c "import torch; print(torch.cuda.get_device_name(0))"
 
-# 3. Run a Python script
+# 3. Or use a CPU runtime
+colab exec --cpu -c "print('hello from cpu')"
+
+# 4. Run a Python script
 colab exec train.py
 
-# 4. Release the runtime when done
+# 5. Release the runtime when done
 colab stop
 ```
 
@@ -51,12 +54,12 @@ colab stop
 | Command | Description |
 |---------|-------------|
 | `auth` | Authenticate via Google OAuth2 (browser flow) |
-| `exec <file>` | Execute a `.py` or `.ipynb` file on Colab GPU |
+| `exec <file>` | Execute a `.py` or `.ipynb` file on Colab |
 | `exec -c "code"` | Execute inline Python code |
 | `quota` | Show CCU balance, burn rate, eligible GPUs |
 | `upload <local> [remote]` | Upload a file to the Colab runtime |
 | `download <remote> [local]` | Download a file from the Colab runtime |
-| `status` | Show runtime info (GPU type, memory, idle time) |
+| `status` | Show runtime info (accelerator, memory, idle time) |
 | `stop` | Release the runtime |
 
 ## Options
@@ -64,6 +67,7 @@ colab stop
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--gpu t4\|l4\|a100` | `t4` | GPU type to request |
+| `--cpu` | off | Request a CPU runtime instead of a GPU |
 | `--timeout 30m` | `30m` | Execution timeout |
 | `--json` | off | Machine-readable JSON output |
 
@@ -78,6 +82,9 @@ colab exec notebook.ipynb
 
 # Request an A100 GPU
 colab exec --gpu a100 train.py
+
+# Request a CPU runtime
+colab exec --cpu -c "print('hello from cpu')"
 
 # Upload training data, run a script, download the model
 colab upload dataset.zip
@@ -124,7 +131,7 @@ colab auth --status
 
 1. **Auth** - OAuth2 loopback flow with S256 PKCE. Tokens are cached at `~/.config/colab/token.json` and auto-refreshed.
 
-2. **Runtime** - Requests a GPU runtime via Colab's backend API. A keep-alive goroutine runs every 60s to prevent idle disconnection.
+2. **Runtime** - Requests a CPU or GPU runtime via Colab's backend API. A keep-alive goroutine runs every 60s to prevent idle disconnection.
 
 3. **Execution** - Connects to the Jupyter kernel over WebSocket, sends `execute_request` messages, and streams `stdout`/`stderr` back to the terminal in real time.
 

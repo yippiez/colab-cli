@@ -15,6 +15,7 @@ import (
 func runExec(args []string) error {
 	jsonOutput := hasFlag(args, "--json")
 	gpu := getFlagValue(args, "--gpu", "t4")
+	cpu := hasFlag(args, "--cpu")
 	timeoutStr := getFlagValue(args, "--timeout", "30m")
 	inlineCode := getFlagValue(args, "-c", "")
 	session := getFlagValue(args, "--session", "")
@@ -97,12 +98,16 @@ func runExec(args []string) error {
 		if !jsonOutput {
 			fmt.Printf("Connecting to session %s...\n", session)
 		}
-		rt, err = client.ResumeRuntime(ctx, gpu, session)
+		rt, err = client.ResumeRuntime(ctx, gpu, cpu, session)
 	} else {
 		if !jsonOutput {
-			fmt.Printf("Requesting %s GPU runtime...\n", strings.ToUpper(gpu))
+			if cpu {
+				fmt.Println("Requesting CPU runtime...")
+			} else {
+				fmt.Printf("Requesting %s GPU runtime...\n", strings.ToUpper(gpu))
+			}
 		}
-		rt, err = client.AssignRuntime(ctx, gpu)
+		rt, err = client.AssignRuntime(ctx, gpu, cpu)
 	}
 	if err != nil {
 		return fmt.Errorf("assign runtime: %w", err)

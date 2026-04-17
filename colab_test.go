@@ -137,3 +137,23 @@ func TestWithAuthUser(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestedAccelerator(t *testing.T) {
+	if got := requestedAccelerator("t4", false); got != "T4" {
+		t.Fatalf("requestedAccelerator(gpu) = %q, want T4", got)
+	}
+	if got := requestedAccelerator("t4", true); got != "NONE" {
+		t.Fatalf("requestedAccelerator(cpu) = %q, want NONE", got)
+	}
+}
+
+func TestAssignRuntimeParams(t *testing.T) {
+	nbHash := "abc"
+
+	if got := assignRuntimeParams(nbHash, "t4", false); got != "?nbh=abc&variant=GPU&accelerator=T4" {
+		t.Fatalf("assignRuntimeParams(gpu) = %q", got)
+	}
+	if got := assignRuntimeParams(nbHash, "t4", true); got != "?nbh=abc" {
+		t.Fatalf("assignRuntimeParams(cpu) = %q", got)
+	}
+}
