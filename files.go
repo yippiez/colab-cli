@@ -14,6 +14,7 @@ import (
 )
 
 const uploadChunkSize = 3 * 1024 * 1024 // 3MB raw → ~4MB base64, well within WS limits
+const downloadChunkSize = 512 * 1024    // Smaller chunks avoid oversized notebook output payloads.
 
 // KernelUpload writes a local file to the runtime filesystem via kernel execution.
 // This is more reliable than the Contents API because it writes directly to the
@@ -97,17 +98,21 @@ func KernelDownload(ctx context.Context, kc *KernelClient, remotePath, localPath
 		return fmt.Errorf("create local directory: %w", err)
 	}
 
-	f, err := os.Create(localPath)
+	tmpPath := localPath + ".part"
+	f, err := os.Create(tmpPath)
 	if err != nil {
-		return fmt.Errorf("create local file: %w", err)
+		return fmt.Errorf("create local temp file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		f.Close()
+		os.Remove(tmpPath)
+	}()
 
-	// Download in chunks
-	for offset := 0; offset < fileSize; offset += uploadChunkSize {
+	// Download in smaller chunks to avoid oversized output payloads.
+	for offset := 0; offset < fileSize; offset += downloadChunkSize {
 		code := fmt.Sprintf(
 			"import base64\nwith open(%q, 'rb') as f:\n    f.seek(%d)\n    print(base64.b64encode(f.read(%d)).decode())",
-			remotePath, offset, uploadChunkSize,
+			remotePath, offset, downloadChunkSize,
 		)
 		output, err := kc.Execute(ctx, code)
 		if err != nil {
@@ -122,6 +127,13 @@ func KernelDownload(ctx context.Context, kc *KernelClient, remotePath, localPath
 		if _, err := f.Write(decoded); err != nil {
 			return fmt.Errorf("write chunk at offset %d: %w", offset, err)
 		}
+	}
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close local temp file: %w", err)
+	}
+	if err := os.Rename(tmpPath, localPath); err != nil {
+		return fmt.Errorf("rename local temp file: %w", err)
 	}
 
 	return nil

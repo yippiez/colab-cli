@@ -51,19 +51,24 @@ func runDownload(args []string) error {
 		return fmt.Errorf("assign runtime: %w", err)
 	}
 
-	// Connect to kernel for reliable file download
-	kc, err := NewKernelClient(ctx, rt)
-	if err != nil {
-		return fmt.Errorf("connect kernel: %w", err)
-	}
-	defer kc.Close()
-
 	if !jsonOutput {
 		fmt.Printf("Downloading %s...\n", remotePath)
 	}
 
-	if err := KernelDownload(ctx, kc, remotePath, localPath); err != nil {
-		return fmt.Errorf("download: %w", err)
+	downloadErr := fmt.Errorf("contents api unavailable")
+	if fc, err := NewFileClient(rt); err == nil {
+		downloadErr = fc.Download(ctx, remotePath, localPath)
+	}
+	if downloadErr != nil {
+		kc, err := NewKernelClient(ctx, rt)
+		if err != nil {
+			return fmt.Errorf("download: contents api failed: %v; connect kernel: %w", downloadErr, err)
+		}
+		defer kc.Close()
+
+		if err := KernelDownload(ctx, kc, remotePath, localPath); err != nil {
+			return fmt.Errorf("download: contents api failed: %v; kernel download failed: %w", downloadErr, err)
+		}
 	}
 
 	dest := localPath
