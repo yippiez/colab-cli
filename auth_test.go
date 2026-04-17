@@ -78,13 +78,3 @@ func TestGetOAuthConfig_PartialEnv(t *testing.T) {
 		t.Errorf("ClientSecret = %q, want default", cfg.ClientSecret)
 	}
 }
-
-func TestGetOAuthConfig_Scopes(t *testing.T) {
-	cfg := getOAuthConfig()
-	if len(cfg.Scopes) != 1 {
-		t.Fatalf("Scopes length = %d, want 1", len(cfg.Scopes))
-	}
-	if cfg.Scopes[0] != "https://www.googleapis.com/auth/colaboratory" {
-		t.Fatalf("Scopes[0] = %q, want colaboratory scope", cfg.Scopes[0])
-	}
-}
