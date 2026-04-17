@@ -28,6 +28,8 @@ func main() {
 		err = runUpload(args)
 	case "download":
 		err = runDownload(args)
+	case "mount-drive":
+		err = runMountDrive(args)
 	case "quota":
 		err = runQuota(args)
 	case "status":
@@ -62,6 +64,7 @@ Commands:
   exec -c "code"        Execute inline Python code on Colab
   upload <local> [remote]   Upload file to the Colab runtime
   download <remote> [local] Download file from the Colab runtime
+  mount-drive           Mount Google Drive in an existing Colab session
   quota                 Show GPU quota, CCU balance, eligible accelerators
   status                Show runtime info (accelerator, memory, idle time)
   stop                  Release the Colab runtime
@@ -87,6 +90,7 @@ Examples:
   colab start --cpu                            # → prints CPU session ID
   colab upload --session <id> data.tar.gz      # upload to that runtime
   colab exec --session <id> train.py           # run on that runtime
+  colab mount-drive --session <id>             # print auth URL and mount Drive
   colab download --session <id> model.bin      # download results
   colab stop                                   # release when done
 `)

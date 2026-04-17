@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -41,6 +43,11 @@ type jupyterHeader struct {
 	Username string `json:"username"`
 	Version  string `json:"version"`
 	Date     string `json:"date"`
+}
+
+type colabAuthRequest struct {
+	AuthType   string
+	ColabMsgID int
 }
 
 // NewKernelClient creates a Jupyter session and connects to the kernel via WebSocket.
@@ -296,6 +303,170 @@ func (kc *KernelClient) ExecuteStream(ctx context.Context, code string, onOutput
 			return output.String(), nil
 		}
 	}
+}
+
+func (kc *KernelClient) MountDrive(ctx context.Context, client *ColabClient, endpoint string, onOutput func(stream, text string)) (string, error) {
+	msgID := uuid.New().String()
+	code := "from google.colab import drive\ndrive.mount('/content/drive')"
+
+	msg := jupyterMessage{
+		Channel: "shell",
+		Header: jupyterHeader{
+			MsgID:    msgID,
+			MsgType:  "execute_request",
+			Session:  kc.sessionID,
+			Username: "colab",
+			Version:  "5.3",
+			Date:     time.Now().UTC().Format(time.RFC3339),
+		},
+		ParentHeader: map[string]interface{}{},
+		Metadata:     map[string]interface{}{},
+		Content: map[string]interface{}{
+			"code":             code,
+			"silent":           false,
+			"store_history":    true,
+			"allow_stdin":      true,
+			"stop_on_error":    true,
+			"user_expressions": map[string]interface{}{},
+		},
+	}
+
+	if err := wsjson.Write(ctx, kc.conn, msg); err != nil {
+		return "", fmt.Errorf("send execute_request: %w", err)
+	}
+
+	var output strings.Builder
+	for {
+		var reply jupyterMessage
+		if err := wsjson.Read(ctx, kc.conn, &reply); err != nil {
+			return output.String(), fmt.Errorf("read message: %w", err)
+		}
+
+		if authReq, ok := parseColabAuthRequest(reply); ok {
+			err := kc.handleEphemeralAuth(ctx, client, endpoint, authReq, onOutput)
+			if sendErr := kc.sendInputReply(ctx, authReq.ColabMsgID, err); sendErr != nil {
+				return output.String(), fmt.Errorf("send auth reply: %w", sendErr)
+			}
+			if err != nil {
+				return output.String(), err
+			}
+			continue
+		}
+
+		parentMsgID, _ := reply.ParentHeader["msg_id"].(string)
+		if parentMsgID != msgID {
+			continue
+		}
+
+		switch reply.Header.MsgType {
+		case "stream":
+			text, _ := reply.Content["text"].(string)
+			if onOutput != nil {
+				name, _ := reply.Content["name"].(string)
+				onOutput(name, text)
+			}
+			output.WriteString(text)
+		case "error":
+			ename, _ := reply.Content["ename"].(string)
+			evalue, _ := reply.Content["evalue"].(string)
+			return output.String(), fmt.Errorf("mount drive error: %s: %s", ename, evalue)
+		case "execute_reply":
+			status, _ := reply.Content["status"].(string)
+			if status == "error" {
+				ename, _ := reply.Content["ename"].(string)
+				evalue, _ := reply.Content["evalue"].(string)
+				return output.String(), fmt.Errorf("mount drive error: %s: %s", ename, evalue)
+			}
+			return output.String(), nil
+		}
+	}
+}
+
+func parseColabAuthRequest(msg jupyterMessage) (colabAuthRequest, bool) {
+	if msg.Header.MsgType != "colab_request" {
+		return colabAuthRequest{}, false
+	}
+	requestType, _ := msg.Metadata["colab_request_type"].(string)
+	if requestType != "request_auth" {
+		return colabAuthRequest{}, false
+	}
+	contentRequest, _ := msg.Content["request"].(map[string]interface{})
+	authType, _ := contentRequest["authType"].(string)
+	if authType == "" {
+		return colabAuthRequest{}, false
+	}
+	colabMsgIDFloat, ok := msg.Metadata["colab_msg_id"].(float64)
+	if !ok {
+		return colabAuthRequest{}, false
+	}
+	return colabAuthRequest{AuthType: authType, ColabMsgID: int(colabMsgIDFloat)}, true
+}
+
+func (kc *KernelClient) handleEphemeralAuth(ctx context.Context, client *ColabClient, endpoint string, req colabAuthRequest, onOutput func(stream, text string)) error {
+	dryRunResult, err := client.PropagateCredentials(ctx, endpoint, req.AuthType, true)
+	if err != nil {
+		return fmt.Errorf("credentials propagation dry run: %w", err)
+	}
+	if dryRunResult.Success {
+		finalResult, err := client.PropagateCredentials(ctx, endpoint, req.AuthType, false)
+		if err != nil {
+			return fmt.Errorf("credentials propagation: %w", err)
+		}
+		if !finalResult.Success {
+			return fmt.Errorf("credentials propagation unsuccessful")
+		}
+		return nil
+	}
+	if dryRunResult.UnauthorizedRedirectURI == "" {
+		return fmt.Errorf("authorization required but no redirect URL was returned")
+	}
+
+	message := "\nGoogle Drive authorization required.\n\nOpen this URL in your browser:\n" + dryRunResult.UnauthorizedRedirectURI + "\n\nAfter completing authorization, press Enter here to continue...\n"
+	if onOutput != nil {
+		onOutput("stdout", message)
+	} else {
+		fmt.Print(message)
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	if _, err := reader.ReadString('\n'); err != nil {
+		return fmt.Errorf("waiting for authorization confirmation: %w", err)
+	}
+
+	finalResult, err := client.PropagateCredentials(ctx, endpoint, req.AuthType, false)
+	if err != nil {
+		return fmt.Errorf("credentials propagation: %w", err)
+	}
+	if !finalResult.Success {
+		return fmt.Errorf("credentials propagation unsuccessful")
+	}
+	return nil
+}
+
+func (kc *KernelClient) sendInputReply(ctx context.Context, requestMessageID int, replyErr error) error {
+	reply := jupyterMessage{
+		Channel: "stdin",
+		Header: jupyterHeader{
+			MsgID:    uuid.New().String(),
+			MsgType:  "input_reply",
+			Session:  kc.sessionID,
+			Username: "username",
+			Version:  "5.0",
+			Date:     time.Now().UTC().Format(time.RFC3339),
+		},
+		ParentHeader: map[string]interface{}{},
+		Metadata:     map[string]interface{}{},
+		Content: map[string]interface{}{
+			"value": map[string]interface{}{
+				"type":         "colab_reply",
+				"colab_msg_id": requestMessageID,
+			},
+		},
+	}
+	if replyErr != nil {
+		reply.Content["value"].(map[string]interface{})["error"] = replyErr.Error()
+	}
+	return wsjson.Write(ctx, kc.conn, reply)
 }
 
 // Close closes the WebSocket connection and cleans up the session.

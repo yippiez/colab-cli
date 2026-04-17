@@ -59,6 +59,7 @@ colab stop
 | `quota` | Show CCU balance, burn rate, eligible GPUs |
 | `upload <local> [remote]` | Upload a file to the Colab runtime |
 | `download <remote> [local]` | Download a file from the Colab runtime |
+| `mount-drive --session <id>` | Print a Drive auth URL and mount Google Drive in an existing session |
 | `status` | Show runtime info (accelerator, memory, idle time) |
 | `stop` | Release the runtime |
 
@@ -86,9 +87,10 @@ colab exec --gpu a100 train.py
 # Request a CPU runtime
 colab exec --cpu -c "print('hello from cpu')"
 
-# Upload training data, run a script, download the model
+# Upload training data, run a script, mount Drive, download the model
 colab upload dataset.zip
 colab exec train.py --timeout 2h
+colab mount-drive --session <id>
 colab download output/model.bin ./model.bin
 
 # JSON output for scripting

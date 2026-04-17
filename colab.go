@@ -584,7 +584,72 @@ type RuntimeStatus struct {
 	Connected bool   `json:"connected"`
 }
 
+type CredentialsPropagationResult struct {
+	Success                 bool   `json:"success"`
+	UnauthorizedRedirectURI string `json:"unauthorized_redirect_uri,omitempty"`
+}
+
 // GetStatus queries the runtime for status information.
+func (c *ColabClient) PropagateCredentials(ctx context.Context, endpoint, authType string, dryRun bool) (*CredentialsPropagationResult, error) {
+	baseURL, err := url.Parse(c.withAuthUser(colabBackendURL + "/tun/m/credentials-propagation/" + endpoint))
+	if err != nil {
+		return nil, fmt.Errorf("parse credentials propagation URL: %w", err)
+	}
+	q := baseURL.Query()
+	q.Set("authtype", authType)
+	q.Set("version", "2")
+	q.Set("dryrun", fmt.Sprintf("%t", dryRun))
+	q.Set("propagate", "true")
+	q.Set("record", "false")
+	baseURL.RawQuery = q.Encode()
+
+	resp, err := c.colabRequest(ctx, "GET", baseURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("credentials propagation GET: %w", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("credentials propagation GET failed (status %d): %s", resp.StatusCode, stripXSSI(body))
+	}
+
+	var xsrfResp struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(stripXSSI(body), &xsrfResp); err != nil {
+		return nil, fmt.Errorf("parse credentials propagation XSRF: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create credentials propagation POST: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("X-Colab-Client-Agent", clientAgent)
+	req.Header.Set("Accept", "application/json")
+	if xsrfResp.Token != "" {
+		req.Header.Set("X-Goog-Colab-Token", xsrfResp.Token)
+	}
+
+	resp, err = c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("credentials propagation POST: %w", err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("credentials propagation POST failed (status %d): %s", resp.StatusCode, stripXSSI(body))
+	}
+
+	var result CredentialsPropagationResult
+	if err := json.Unmarshal(stripXSSI(body), &result); err != nil {
+		return nil, fmt.Errorf("parse credentials propagation result: %w", err)
+	}
+	return &result, nil
+}
+
 func (c *ColabClient) GetStatus(ctx context.Context, rt *Runtime) (*RuntimeStatus, error) {
 	code := `
 import json, subprocess
